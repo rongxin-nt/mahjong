@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="麻將記帳">
+<meta name="theme-color" content="#0a1612">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>麻將台數記帳</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: a felt mahjong table seen from above; four seats on its sides, the round shown in the middle, actions in a wooden rail at the thumb. Single dark "game table" look by choice. */
+:root{
+  color-scheme:dark;
+  --room:#0a1612; --room-2:#10221c;
+  --felt:#13604a; --felt-hi:#1b7a5e; --felt-lo:#0b3d2f;
+  --wood:#6b4426; --wood-hi:#94633a; --wood-lo:#3d2614;
+  --gold:#e8c26a; --gold-hi:#fbe3a2; --gold-lo:#a9802f;
+  --ivory:#f4eedc; --ivory-lo:#d8ceb0; --tile-back:#2f8a62; --tile-ink:#1b2a24;
+  --red:#d2412f; --ink:#eef4ef; --muted:#9fb7ab; --line:rgba(232,194,106,.28);
+  --panel:rgba(6,22,17,.78); --panel-solid:#0e2a21;
+  --pos:#7be3a9; --neg:#ff8a75;
+  --f-display:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  --f-body:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:radial-gradient(120% 80% at 50% 0%,var(--room-2),var(--room) 70%) fixed,var(--room);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--room)}
+#app{max-width:560px;margin:0 auto;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));padding-block:14px 128px}
+h1,h2,h3{font-family:var(--f-display);font-weight:900;text-wrap:balance;margin:0;letter-spacing:.02em}
+h1{font-size:30px;line-height:1.2}
+h2{font-size:22px}
+h3{font-size:17px;color:var(--gold)}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:linear-gradient(#173a2f,#0f2a22);color:var(--ink);border-radius:12px;padding:10px 14px;font-weight:700;min-height:46px;box-shadow:0 3px 0 #06140f,inset 0 1px 0 rgba(255,255,255,.06)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #06140f}
+.btn.gold{background:linear-gradient(var(--gold-hi),var(--gold) 45%,var(--gold-lo));color:#3a2608;border-color:#f6d98f;box-shadow:0 3px 0 #6b4c14,0 0 18px rgba(232,194,106,.25)}
+.btn.red{background:linear-gradient(#e85a45,#b3301f);border-color:#f08a78;color:#fff;box-shadow:0 3px 0 #5e160c}
+.btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--gold);padding-inline:8px;min-height:40px;font-weight:500}
+.btn.block{width:100%}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;backdrop-filter:blur(6px)}
+
+/* form */
+input[type=text],select{font:inherit;color:var(--ink);background:#08201a;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px;width:100%}
+input::placeholder{color:#5f7d70}
+label.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.check{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
+.check input{width:20px;height:20px;margin-top:2px;accent-color:var(--gold);flex:none}
+details.table summary{cursor:pointer;color:var(--gold);font-weight:500;padding:6px 0}
+.taiedit{display:grid;grid-template-columns:1fr 76px;gap:6px 10px;align-items:center;margin-top:8px}
+.taiedit input{min-height:38px;padding:6px 8px;text-align:right}
+.taiedit .g{grid-column:1/-1;font-size:12px;color:var(--gold);letter-spacing:.1em;margin-top:8px}
+.seatform{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center}
+
+/* mahjong tile */
+.tile{display:inline-grid;place-items:center;width:34px;height:44px;border-radius:6px;background:linear-gradient(#fffdf4,var(--ivory) 60%,var(--ivory-lo));color:var(--tile-ink);font-family:var(--f-display);font-weight:900;font-size:21px;line-height:1;
+  box-shadow:0 4px 0 var(--tile-back),0 5px 0 #1d5a40,0 7px 10px rgba(0,0,0,.45);flex:none}
+.tile.red{color:var(--red)}
+.tile.lg{width:52px;height:68px;font-size:34px;border-radius:8px;box-shadow:0 6px 0 var(--tile-back),0 7px 0 #1d5a40,0 10px 16px rgba(0,0,0,.5)}
+
+/* table */
+.hud{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.hud .stake{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;min-height:40px;font-weight:700}
+.hud .stake small{color:var(--muted);font-weight:400}
+.table{position:relative;border-radius:26px;padding:12px;background:
+  radial-gradient(ellipse at center,var(--felt-hi) 0%,var(--felt) 45%,var(--felt-lo) 100%);
+  border:8px solid var(--wood);box-shadow:inset 0 0 0 2px var(--wood-hi),inset 0 0 40px rgba(0,0,0,.45),0 0 0 2px var(--wood-lo),0 18px 40px rgba(0,0,0,.55);
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:". top ." "left mid right" ". bottom .";gap:10px;align-items:center}
+.table::after{content:"";position:absolute;inset:10px;border-radius:18px;border:1px dashed rgba(255,255,255,.08);pointer-events:none}
+.seat{position:relative;z-index:1;border:1px solid rgba(232,194,106,.35);background:linear-gradient(rgba(5,25,19,.72),rgba(5,25,19,.88));border-radius:14px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;min-width:0;box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.seat:active{transform:scale(.97)}
+.seat.s0{grid-area:bottom}.seat.s1{grid-area:right}.seat.s2{grid-area:top}.seat.s3{grid-area:left}
+.seat.s0,.seat.s2{flex-direction:row;justify-content:center;gap:10px;text-align:left;padding:8px 12px}
+.seat .who{display:flex;flex-direction:column;min-width:0;align-items:inherit}
+.seat .nm{font-weight:900;font-size:16px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .bal{font-weight:900;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.15}
+.seat.dealer{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(232,194,106,.35),0 6px 14px rgba(0,0,0,.35)}
+.badge{position:absolute;top:-10px;right:-6px;background:linear-gradient(#ef5d47,#b32b1b);color:#fff;font-family:var(--f-display);font-weight:700;font-size:13px;border-radius:999px;padding:1px 8px;border:1px solid #ffb3a5;box-shadow:0 2px 6px rgba(0,0,0,.4);white-space:nowrap}
+.mid{grid-area:mid;position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 0;text-align:center}
+.mid .tiles{display:flex;gap:6px;margin-bottom:4px}
+.mid .rd{font-family:var(--f-display);font-weight:700;font-size:15px;color:var(--gold-hi)}
+.mid .dl{font-size:12px;color:#cfe3d8;line-height:1.35}
+.hint{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+
+/* log */
+.log{display:flex;flex-direction:column;gap:8px}
+.hand{background:var(--panel);border:1px solid rgba(232,194,106,.18);border-radius:14px;padding:10px 12px}
+.hand .h1{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.hand .h2{font-weight:700;margin-top:2px}
+.hand .h2 .tai{color:var(--gold);font-family:var(--f-display)}
+.hand .h3{font-size:12px;color:var(--muted)}
+.deltas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px;font-size:13px}
+.deltas div{display:flex;flex-direction:column;min-width:0}
+.deltas span:first-child{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+
+/* action rail */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:linear-gradient(var(--wood-hi),var(--wood) 30%,var(--wood-lo));border-top:2px solid var(--gold-lo);box-shadow:0 -8px 24px rgba(0,0,0,.5);
+  padding:10px max(14px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+.bar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:10px}
+.bar .btn{min-height:54px;font-size:18px;font-family:var(--f-display)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:linear-gradient(#123429,#0a2019);width:100%;max-width:600px;max-height:94%;border-radius:22px 22px 0 0;border-top:2px solid var(--gold);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -10px 40px rgba(0,0,0,.6)}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.sheet-h h2{color:var(--gold-hi)}
+.sheet-b{overflow-y:auto;padding:6px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet-f{border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(0,0,0,.25)}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec>.lbl{font-size:12px;color:var(--gold);letter-spacing:.12em}
+.pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chip{border:1px solid var(--line);background:#0b241d;border-radius:12px;padding:8px 12px;min-height:46px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700}
+.chip small{color:var(--muted);font-weight:400;font-size:12px}
+.chip[aria-pressed="true"]{background:linear-gradient(var(--gold-hi),var(--gold));border-color:var(--gold-hi);color:#3a2608}
+.chip[aria-pressed="true"] small{color:#6b4c14}
+.counter{display:inline-flex;align-items:center;border:1px solid var(--line);background:#0b241d;border-radius:12px;min-height:46px;padding-left:14px;gap:4px;font-weight:700}
+.counter b{min-width:22px;text-align:center}
+.counter button{border:0;background:transparent;width:42px;height:44px;font-size:22px;color:var(--gold)}
+.counter button:disabled{color:#3c5a4e}
+.note{background:rgba(232,194,106,.08);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;font-size:13px;color:#cfe3d8}
+.note b{color:var(--gold-hi)}
+
+/* keypad */
+.screen{display:flex;align-items:baseline;justify-content:center;gap:8px;background:#04130e;border:1px solid var(--line);border-radius:14px;padding:6px 12px;box-shadow:inset 0 2px 10px rgba(0,0,0,.6)}
+.screen b{font-family:var(--f-display);font-weight:900;font-size:52px;line-height:1.1;color:var(--gold-hi);min-width:1ch;text-align:center}
+.screen b.empty{color:#3f5c50}
+.screen span{color:var(--muted)}
+.keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px;padding:4px 2px 8px}
+.key{height:54px;border:0;border-radius:10px;background:linear-gradient(#fffdf4,var(--ivory) 60%,var(--ivory-lo));color:var(--tile-ink);font-family:var(--f-display);font-weight:900;font-size:26px;
+  box-shadow:0 5px 0 var(--tile-back),0 6px 0 #1d5a40,0 8px 12px rgba(0,0,0,.4)}
+.key:active{transform:translateY(4px);box-shadow:0 1px 0 var(--tile-back),0 2px 0 #1d5a40}
+.key.fn{font-family:var(--f-body);font-size:16px;color:#55665e}
+.total{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.total b{font-size:20px}
+.pay{font-size:13px;color:var(--muted);margin:2px 0 10px}
+
+/* ref table */
+.refg{display:flex;flex-direction:column;padding:4px 0}
+.refg+.refg{border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.ref{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 0}
+.ref small{display:block;font-size:12px;color:var(--muted)}
+.ref b{font-family:var(--f-display);font-size:18px;color:var(--gold-hi);white-space:nowrap}
+
+/* home & settle */
+.logo{display:flex;gap:8px;margin:18px 0 14px}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:36ch}
+.gamelist{display:flex;flex-direction:column;gap:10px}
+.gitem{display:block;text-align:left;width:100%;border-radius:16px}
+.pill{display:inline-block;font-size:12px;border-radius:999px;padding:1px 10px;border:1px solid var(--line);color:var(--muted)}
+.pill.live{border-color:var(--gold);color:var(--gold)}
+.rank{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.rank:last-child{border-bottom:0}
+.rank .v{font-size:24px;font-weight:900}
+.rank .nm{font-weight:900;font-size:17px}
+.medal{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:#3a2608;background:radial-gradient(circle at 35% 30%,#fff3c4,var(--gold) 55%,var(--gold-lo));box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.medal.m2{background:radial-gradient(circle at 35% 30%,#fff,#c9d1d6 55%,#7d8a91);color:#26323a}
+.medal.m3{background:radial-gradient(circle at 35% 30%,#ffd9b8,#c9824a 55%,#7a4620);color:#2e1607}
+.medal.m4{background:#173a2f;color:var(--muted);box-shadow:none;border:1px solid var(--line)}
+.xfer{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+.xfer:last-child{border-bottom:0}
+.xfer .arrow{color:var(--gold)}
+.sync{font-size:12px;color:var(--muted);text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:40;background:linear-gradient(var(--gold-hi),var(--gold));color:#3a2608;font-weight:700;padding:10px 18px;border-radius:999px;font-size:14px;max-width:90%;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.65);display:grid;place-items:center;padding:16px}
+.modal .panel{max-width:360px;width:100%;background:var(--panel-solid)}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.5}}}
+@media (max-width:360px){.seat .bal{font-size:17px}.seat .nm{font-size:14px}.tile{width:30px;height:40px;font-size:19px}}
+</style>
+
+<div id="app"></div>
+<div id="sheet"></div>
+<div id="modal"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+// ---------- 規則資料 ----------
+const WINDS = ['東','南','西','北'];
+const CN = ['零','一','二','三','四','五','六','七','八','九','十'];
+const cn = n => n <= 10 ? CN[n] : String(n);
+const SAMPLE_NAMES = ['阿明','小華','阿珍','志偉'];
+// 牌型台數參考表：[id, 名稱, 預設台數, 說明]
+const GROUPS = [
+  {name:'基本', items:[['zimo','自摸',1],['menqing','門清',1,'沒有吃、碰、明槓'],['mqzimo','門清自摸',3,'門清 1 + 自摸 1 + 不求人 1'],['quanqiu','全求人',2],['duting','獨聽',1,'邊張、中洞、單吊'],['pinghu','平胡',2],['haidi','海底撈月',1],['hedi','河底撈魚',1],['gangkai','槓上開花',1],['qianggang','搶槓',1]]},
+  {name:'字牌', items:[['quanfeng','圈風刻',1],['menfeng','門風刻',1],['sanyuan','三元牌刻',1,'中、發、白，每組 1 台'],['xiaosanyuan','小三元',4],['dasanyuan','大三元',8],['xiaosixi','小四喜',8],['dasixi','大四喜',16],['ziyise','字一色',16]]},
+  {name:'花牌', items:[['zhenghua','正花',1,'自己座位的花，每張 1 台'],['huagang','花槓',2,'春夏秋冬或梅蘭竹菊湊齊'],['qiqiangyi','七搶一',8],['baxian','八仙過海',8]]},
+  {name:'牌型', items:[['pengpeng','碰碰胡',4],['hunyise','混一色',4],['qingyise','清一色',8],['an3','三暗刻',2],['an4','四暗刻',5],['an5','五暗刻',8]]},
+  {name:'天地', items:[['diting','地聽',8],['tianting','天聽',16],['dihu','地胡',16],['tianhu','天胡',32]]},
+];
+const DEFS = GROUPS.flatMap(g => g.items.map(([id,name,tai,note]) => ({id,name,tai,note})));
+const AUTO = [['dealer','莊家',1],['lian','連莊拉莊（每連一次）',2]];
+const taiOf = (g,id) => { const v = g.rules.tai[id]; return v === undefined ? DEFS.find(d => d.id === id).tai : v; };
+
+function defaultRules(){
+  const tai = {};
+  DEFS.forEach(d => tai[d.id] = d.tai);
+  AUTO.forEach(([id,,t]) => tai[id] = t);
+  return {base:100, per:20, dealerPaysOnTsumo:false, drawKeepsDealer:true, tai};
+}
+
+// ---------- 牌局計算（純函式） ----------
+const dealerOf = g => (g.startDealer + g.rotations) % 4;
+const roundName = rot => WINDS[Math.floor(rot/4)%4] + '風' + WINDS[rot%4] + '局';
+const seatWind = (g,p) => WINDS[(p - dealerOf(g) + 4) % 4];
+const dealerTai = g => g.rules.tai.dealer + g.rules.tai.lian * g.streak;
+const streakName = n => n ? `連${cn(n)}拉${cn(n)}` : '';
+
+function balances(g){
+  const b = [0,0,0,0];
+  g.hands.forEach(h => h.deltas.forEach((d,i) => b[i] += d));
+  return b;
+}
+
+// loser = -1 代表自摸。handTai 是玩家自己算好的總台數（已含莊家台）。
+// 唯一例外是可選小規則：閒家自摸時，莊家另外多付莊家台。
+function calcWin(g, winner, loser, handTai){
+  const R = g.rules, zimo = loser === -1, dealer = dealerOf(g), dTai = dealerTai(g);
+  const payers = zimo ? [0,1,2,3].filter(p => p !== winner) : [loser];
+  const deltas = [0,0,0,0], lines = [];
+  payers.forEach(p => {
+    const extra = zimo && R.dealerPaysOnTsumo && winner !== dealer && p === dealer ? dTai : 0;
+    const tai = handTai + extra, amt = R.base + tai * R.per;
+    deltas[p] -= amt; deltas[winner] += amt;
+    lines.push({p, tai, amt, extra});
+  });
+  return {handTai, dealerTai:dTai, lines, deltas};
+}
+
+function applyWin(g, winner, loser, handTai){
+  const r = calcWin(g, winner, loser, handTai);
+  g.hands.push({type:'win', round:roundName(g.rotations), dealer:dealerOf(g), streak:g.streak, winner, loser,
+    handTai:r.handTai, dealerTai:r.dealerTai, lines:r.lines, deltas:r.deltas,
+    base:g.rules.base, per:g.rules.per, before:{rotations:g.rotations, streak:g.streak}, t:Date.now()});
+  if (winner === dealerOf(g)) g.streak++; else { g.rotations++; g.streak = 0; }
+}
+
+function applyDraw(g){
+  g.hands.push({type:'draw', round:roundName(g.rotations), dealer:dealerOf(g), streak:g.streak, deltas:[0,0,0,0],
+    before:{rotations:g.rotations, streak:g.streak}, t:Date.now()});
+  if (g.rules.drawKeepsDealer) g.streak++; else { g.rotations++; g.streak = 0; }
+}
+
+// 詐胡：一家賠三家，莊家不變
+function applyFalse(g, who, tai){
+  const amt = g.rules.base + tai * g.rules.per, deltas = [0,0,0,0];
+  [0,1,2,3].forEach(p => { if (p !== who){ deltas[p] += amt; deltas[who] -= amt; } });
+  g.hands.push({type:'false', round:roundName(g.rotations), dealer:dealerOf(g), streak:g.streak, who, tai, amt, deltas,
+    before:{rotations:g.rotations, streak:g.streak}, t:Date.now()});
+}
+
+function undo(g){
+  const h = g.hands.pop();
+  if (h){ g.rotations = h.before.rotations; g.streak = h.before.streak; }
+  return h;
+}
+
+// 最少筆數的付款清單
+function transfers(b){
+  const cr = [], de = [];
+  b.forEach((v,i) => { if (v > 0) cr.push([i,v]); else if (v < 0) de.push([i,-v]); });
+  cr.sort((a,c) => c[1]-a[1]); de.sort((a,c) => c[1]-a[1]);
+  const out = []; let i = 0, j = 0;
+  while (i < de.length && j < cr.length){
+    const m = Math.min(de[i][1], cr[j][1]);
+    out.push({from:de[i][0], to:cr[j][0], amt:m});
+    de[i][1] -= m; cr[j][1] -= m;
+    if (!de[i][1]) i++;
+    if (!cr[j][1]) j++;
+  }
+  return out;
+}
+
+// ---------- 儲存 ----------
+const KEY = 'mj-ledger-v1';
+let store = {games:{}, currentId:null};
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.games) store = s; } catch(e){}
+let db = null, uid = null, syncState = 'local';
+const dirty = new Set(); let flushing = false;
+const docPath = k => `data/users/${uid}/${k}`;
+
+function save(g){
+  if (g) g.updatedAt = Date.now();
+  store.updatedAt = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){}
+  if (g) dirty.add('g' + g.id);
+  dirty.add('meta');
+  flush();
+}
+async function flush(){
+  if (flushing || !db || !uid) return;
+  flushing = true;
+  try {
+    while (dirty.size){
+      const k = dirty.values().next().value; dirty.delete(k);
+      try {
+        if (k === 'meta') await db.doc(docPath('meta')).set({currentId:store.currentId || null, updatedAt:store.updatedAt || Date.now()});
+        else {
+          const g = store.games[k.slice(1)];
+          if (g) await db.doc(docPath(k)).set(JSON.parse(JSON.stringify(g)));
+          else await db.doc(docPath(k)).delete();
+        }
+        syncState = 'cloud';
+      } catch(e){ syncState = 'error'; }
+    }
+  } finally { flushing = false; updateSync(); }
+}
+async function connect(){
+  if (!window.claude || !claude.use) return;
+  try {
+    const [d, u] = await Promise.all([claude.use('db'), claude.use('user')]);
+    if (!d || !u) return;
+    const id = await u.id();
+    if (!id) return;
+    db = d; uid = id;
+    const snap = await db.collection(`data/users/${uid}`).get();
+    let changed = false;
+    snap.docs.forEach(doc => {
+      const v = doc.data(); if (!v) return;
+      if (doc.id === 'meta'){
+        if ((v.updatedAt || 0) > (store.updatedAt || 0)){ store.currentId = v.currentId; store.updatedAt = v.updatedAt; changed = true; }
+        return;
+      }
+      if (!doc.id.startsWith('g')) return;
+      const gid = doc.id.slice(1), local = store.games[gid];
+      if (!local || (v.updatedAt || 0) > (local.updatedAt || 0)){ store.games[gid] = v; changed = true; }
+    });
+    Object.values(store.games).forEach(g => {
+      const r = snap.docs.find(d => d.id === 'g' + g.id);
+      if (!r || (g.updatedAt || 0) > (r.data().updatedAt || 0)) dirty.add('g' + g.id);
+    });
+    dirty.add('meta');
+    syncState = 'cloud';
+    if (changed){ try { localStorage.setItem(KEY, JSON.stringify(store)); } catch(e){} if (!ui.sheet) render(); }
+    flush(); updateSync();
+  } catch(e){ syncState = 'local'; updateSync(); }
+}
+function syncText(){
+  return syncState === 'cloud' ? '已同步到你的帳號' : syncState === 'error' ? '同步失敗，資料仍存在此裝置' : '資料存在此裝置';
+}
+function updateSync(){ document.querySelectorAll('.sync').forEach(el => el.textContent = syncText()); }
+
+// ---------- UI 狀態 ----------
+let ui = {view:'home', sheet:null};
+const cur = () => store.games[store.currentId];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('zh-TW');
+const money = n => Math.abs(n).toLocaleString('zh-TW');
+const cls = n => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const dstr = t => { const d = new Date(t); return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+if (cur() && !cur().endedAt) ui.view = 'game';
+
+// 數字欄位：一律叫出純數字鍵盤
+const numAttrs = 'type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"';
+
+// ---------- 畫面 ----------
+function homeView(){
+  const list = Object.values(store.games).sort((a,b) => b.createdAt - a.createdAt);
+  const live = list.filter(g => !g.endedAt), done = list.filter(g => g.endedAt);
+  const item = g => {
+    const b = balances(g);
+    return `<button class="panel gitem" data-act="open" data-id="${g.id}">
+      <div class="spread"><span class="small muted">${dstr(g.createdAt)} · ${g.hands.length} 局</span>
+      <span class="pill ${g.endedAt ? '' : 'live'}">${g.sample ? '範例' : g.endedAt ? '已結算' : '進行中'}</span></div>
+      <div class="deltas">${g.players.map((p,i) => `<div><span>${esc(p)}</span><b class="num ${cls(b[i])}">${fmt(b[i]) || '0'}</b></div>`).join('')}</div>
+    </button>`;
+  };
+  return `<div class="hero">
+      <div class="logo"><span class="tile lg">麻</span><span class="tile lg red">將</span><span class="tile lg">記</span><span class="tile lg">帳</span></div>
+      <div class="eyebrow">台灣十六張 · 取代籌碼</div><h1>麻將台數記帳</h1>
+      <p>每局記下誰胡、幾台，程式幫你算錢，整場結束一次結帳。</p></div>
+    <div class="stack" style="margin-top:18px">
+      <button class="btn gold block" data-act="new" style="min-height:56px;font-size:19px;font-family:var(--f-display)">開新牌局</button>
+      ${live.length ? `<h3 style="margin-top:6px">進行中</h3><div class="gamelist">${live.map(item).join('')}</div>` : ''}
+      ${done.length ? `<h3 style="margin-top:6px">已結算</h3><div class="gamelist">${done.map(item).join('')}</div>` : ''}
+      <button class="btn block" data-act="backup">備份與還原紀錄<span class="small muted" style="font-weight:400">　${store.lastBackup ? '上次備份 ' + dstr(store.lastBackup) : '還沒備份過'}</span></button>
+      ${!list.length ? `<div class="note">還沒有牌局。按「開新牌局」輸入四位玩家和底、台金額就能開始。<br><button class="btn ghost" data-act="sample" style="padding-left:0">先載入範例牌局看看 ›</button></div>` : ''}
+      <div class="sync">${syncText()}</div>
+    </div>`;
+}
+
+// ---------- 備份與還原 ----------
+const BK_PREFIX = 'MJ1:';
+const backupCode = () => BK_PREFIX + JSON.stringify({v:1, t:Date.now(), games:store.games});
+const validGame = g => g && typeof g.id === 'string' && Array.isArray(g.players) && g.players.length === 4 && Array.isArray(g.hands) && g.rules && typeof g.rotations === 'number';
+// 合併還原：沒有的牌局加進來，同一場以較新的為準，不會刪掉手機上現有的紀錄
+function mergeBackup(text){
+  const s = String(text || '').trim();
+  const i = s.indexOf(BK_PREFIX);
+  if (i < 0) return {error:'這不是備份碼。請貼上以「MJ1:」開頭的整段文字。'};
+  let data;
+  try { data = JSON.parse(s.slice(i + BK_PREFIX.length)); } catch(e){ return {error:'備份碼不完整，可能少複製到一段，請重新複製整段再試一次。'}; }
+  if (!data || typeof data.games !== 'object') return {error:'備份碼裡沒有牌局資料。'};
+  let added = 0, updated = 0, same = 0;
+  Object.values(data.games).forEach(g => {
+    if (!validGame(g)) return;
+    const local = store.games[g.id];
+    if (!local){ store.games[g.id] = g; added++; dirty.add('g' + g.id); }
+    else if ((g.updatedAt || 0) > (local.updatedAt || 0)){ store.games[g.id] = g; updated++; dirty.add('g' + g.id); }
+    else same++;
+  });
+  return {added, updated, same};
+}
+
+function backupView(){
+  const n = Object.keys(store.games).length;
+  return `<div class="hud"><button class="btn ghost" data-act="home" style="padding-left:0">‹ 首頁</button></div>
+    <h1>備份與還原</h1>
+    <div class="panel stack" style="margin-top:14px">
+      <h3>備份</h3>
+      <p class="small muted" style="margin:0">把 ${n} 場牌局存成一段備份碼。複製後貼到 LINE 的「Keep 筆記」、備忘錄，或傳給自己保存。</p>
+      <button class="btn gold block" data-act="bk-copy">複製備份碼</button>
+      <textarea id="bkout" readonly hidden style="width:100%;min-height:110px;font-size:12px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#08201a;color:var(--ink)"></textarea>
+    </div>
+    <div class="panel stack" style="margin-top:12px">
+      <h3>還原</h3>
+      <p class="small muted" style="margin:0">長按下面的框框選「貼上」，再按還原。手機上現有的紀錄不會被刪掉；同一場牌局會保留比較新的那份。</p>
+      <textarea id="bkin" placeholder="在這裡貼上 MJ1: 開頭的備份碼" style="width:100%;min-height:110px;font-size:12px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#08201a;color:var(--ink)"></textarea>
+      <p class="small" id="bkmsg" role="status" style="margin:0"></p>
+      <button class="btn block" data-act="bk-restore">還原</button>
+    </div>`;
+}
+
+function rulesForm(r){
+  const n = (id,label,val) => `<label for="${id}">${label}</label><input ${numAttrs} id="${id}" value="${val}">`;
+  return `<div class="grid2">
+      <label class="field" for="r_base">底（每局基本）<input ${numAttrs} id="r_base" value="${r.base}"></label>
+      <label class="field" for="r_per">每台金額<input ${numAttrs} id="r_per" value="${r.per}"></label>
+    </div>
+    <label class="check" for="r_dkd"><input type="checkbox" id="r_dkd" ${r.drawKeepsDealer ? 'checked' : ''}><span>流局時莊家連莊<br><span class="small muted">一般打法是流局也算連莊</span></span></label>
+    <label class="check" for="r_dpt"><input type="checkbox" id="r_dpt" ${r.dealerPaysOnTsumo ? 'checked' : ''}><span>小規則：閒家自摸時，莊家要多付莊家台<br><span class="small muted">預設關閉：閒家自摸，三家付一樣</span></span></label>
+    <details class="table"><summary>台數表（參考用，可改成你們的算法）</summary>
+      <div class="taiedit">
+        <div class="g">莊家</div>${AUTO.map(([id,name]) => n('r_t_'+id, name, r.tai[id])).join('')}
+        ${GROUPS.map(g => `<div class="g">${g.name}</div>` + g.items.map(([id,name,tai]) => n('r_t_'+id, name, r.tai[id] === undefined ? tai : r.tai[id])).join('')).join('')}
+      </div>
+    </details>`;
+}
+function readRules(base){
+  const r = JSON.parse(JSON.stringify(base));
+  const num = id => { const s = document.getElementById(id).value.trim(); if (!/^\d+$/.test(s)) return null; return parseInt(s, 10); };
+  r.base = num('r_base'); r.per = num('r_per');
+  if (r.base === null || r.per === null) return '請輸入底和每台金額（0 以上的整數）';
+  r.drawKeepsDealer = document.getElementById('r_dkd').checked;
+  r.dealerPaysOnTsumo = document.getElementById('r_dpt').checked;
+  for (const id of [...AUTO.map(a => a[0]), ...DEFS.map(d => d.id)]){ const v = num('r_t_' + id); if (v !== null) r.tai[id] = v; }
+  return r;
+}
+
+function setupView(){
+  const last = Object.values(store.games).sort((a,b) => b.createdAt - a.createdAt)[0];
+  const names = last ? last.players : ['','','',''];
+  const rules = last ? last.rules : defaultRules();
+  return `<div class="hud"><button class="btn ghost" data-act="home">‹ 返回</button></div>
+    <h1>開新牌局</h1>
+    <form class="stack" id="setup" style="margin-top:14px">
+      <div class="panel stack">
+        <h3>入座</h3>
+        ${[0,1,2,3].map(i => `<div class="seatform"><span class="tile">${WINDS[i]}</span><input type="text" id="p${i}" maxlength="8" value="${esc(names[i])}" placeholder="${WINDS[i]}位玩家，例如 ${SAMPLE_NAMES[i]}" aria-label="${WINDS[i]}位玩家"></div>`).join('')}
+        <label class="field" for="sd">起莊（第一局莊家）<select id="sd">${[0,1,2,3].map(i => `<option value="${i}">${WINDS[i]}位</option>`).join('')}</select></label>
+      </div>
+      <div class="panel stack"><h3>底與台</h3>${rulesForm(rules)}</div>
+      <p class="small neg" id="err" role="alert"></p>
+      <button type="submit" class="btn gold block" style="min-height:56px;font-size:19px;font-family:var(--f-display)">開始打牌</button>
+    </form>`;
+}
+
+function gameView(){
+  const g = cur(); if (!g) return homeView();
+  const b = balances(g), d = dealerOf(g), jiang = Math.floor(g.rotations/16) + 1;
+  const rw = WINDS[Math.floor(g.rotations/4)%4], dw = WINDS[g.rotations%4];
+  const seat = p => `<button class="seat s${p} ${p === d ? 'dealer' : ''}" data-act="seat" data-p="${p}" aria-label="${esc(g.players[p])} 胡牌">
+      ${p === d ? `<span class="badge">莊${g.streak ? ' ' + streakName(g.streak) : ''}</span>` : ''}
+      <span class="tile ${p === d ? 'red' : ''}">${seatWind(g,p)}</span>
+      <span class="who"><span class="nm">${esc(g.players[p])}</span><span class="bal ${cls(b[p])}">${fmt(b[p]) || '0'}</span></span>
+    </button>`;
+  // 只顯示最近一局，其餘摺疊
+  const all = g.hands.map((h,i) => [h,i]).reverse();
+  const older = all.slice(1);
+  const hands = all.length ? handCard(g, all[0][0], all[0][1]) + (older.length ? `
+    <button class="btn block" data-act="toggle-log" aria-expanded="${!!ui.showAll}">${ui.showAll ? '收起之前的紀錄' : `查看之前的 ${older.length} 局 ▾`}</button>
+    ${ui.showAll ? older.map(([h,i]) => handCard(g,h,i)).join('') : ''}` : '') : '';
+  return `<div class="hud">
+      <button class="btn ghost" data-act="home" style="padding-left:0">‹ 首頁</button>
+      <button class="stake" data-act="sheet" data-s="rules"><small>底</small><span class="num">${g.rules.base}</span><small>台</small><span class="num">${g.rules.per}</span></button>
+    </div>
+    <div class="table">
+      ${seat(2)}${seat(3)}
+      <div class="mid">
+        <div class="tiles"><span class="tile">${rw}</span><span class="tile">${dw}</span></div>
+        <div class="rd">${rw}風${dw}局${jiang > 1 ? ` · 第${cn(jiang)}將` : ''}</div>
+        <div class="dl">第 ${g.hands.length + 1} 局<br>莊家台 ${dealerTai(g)} 台</div>
+      </div>
+      ${seat(1)}${seat(0)}
+    </div>
+    <div class="hint">點玩家可以直接記他胡牌</div>
+    <div class="spread" style="margin:16px 0 8px"><h3>${g.hands.length ? '上一局' : '牌局紀錄'}</h3>
+      <div class="row" style="gap:0"><button class="btn ghost" data-act="sheet" data-s="table">台數表</button>${g.hands.length ? `<button class="btn ghost" data-act="undo">復原</button>` : ''}<button class="btn ghost" data-act="settle">結算</button></div></div>
+    <div class="log">${hands || `<div class="note">還沒有紀錄。有人胡牌就點他，或按下面的「胡牌」；流局按「流局」。</div>`}</div>
+    <div class="sync" style="margin-top:12px">${syncText()}${g.sample ? ' · 這是範例牌局' : ''}</div>
+    <div class="bar"><div class="in">
+      <button class="btn gold" data-act="sheet" data-s="win">胡 牌</button>
+      <button class="btn" data-act="draw">流局</button>
+      <button class="btn" data-act="sheet" data-s="more">更多</button>
+    </div></div>`;
+}
+
+function handCard(g,h,i){
+  const P = g.players.map(esc);
+  let title = '', sub = '';
+  if (h.type === 'win'){
+    title = (h.loser === -1 ? `${P[h.winner]} 自摸` : `${P[h.winner]} 胡　${P[h.loser]} 放槍`) + `　<span class="tai">${h.handTai} 台</span>`;
+    if (h.items) sub = h.items.map(x => `${x.name}${x.tai}`).join('、');
+    const ex = h.lines.find(l => l.extra);
+    if (ex) sub += `${sub ? ' ／ ' : ''}莊家另付莊家台 ${ex.extra}`;
+  } else if (h.type === 'draw'){
+    title = '流局';
+  } else {
+    title = `${P[h.who]} 詐胡`; sub = `賠三家，每家 ${money(h.amt)}`;
+  }
+  const deltas = h.type === 'draw' ? '' : `<div class="deltas">${g.players.map((p,k) => `<div><span>${esc(p)}</span><b class="num ${cls(h.deltas[k])}">${fmt(h.deltas[k]) || '0'}</b></div>`).join('')}</div>`;
+  return `<div class="hand"><div class="h1"><span>#${i+1} ${h.round}</span><span>莊 ${P[h.dealer]}${h.streak ? ' ' + streakName(h.streak) : ''}</span></div>
+    <div class="h2">${title}</div>${sub ? `<div class="h3">${sub}</div>` : ''}${deltas}</div>`;
+}
+
+function settleView(){
+  const g = cur(); if (!g) return homeView();
+  const b = balances(g);
+  const order = [0,1,2,3].sort((x,y) => b[y] - b[x]);
+  const xs = transfers(b);
+  return `<div class="hud"><button class="btn ghost" data-act="${g.endedAt ? 'home' : 'back'}" style="padding-left:0">‹ ${g.endedAt ? '首頁' : '回牌桌'}</button></div>
+    <div class="eyebrow">${dstr(g.createdAt)} · 共 ${g.hands.length} 局 · 底 ${g.rules.base} / 台 ${g.rules.per}</div>
+    <h1>整場結算</h1>
+    <div class="panel" style="margin-top:14px">${order.map((p,k) => `<div class="rank"><span class="medal m${k+1}">${k+1}</span><span class="nm">${esc(g.players[p])}</span><span class="v num ${cls(b[p])}">${fmt(b[p]) || '0'}</span></div>`).join('')}</div>
+    <h3 style="margin:18px 0 8px">誰付給誰</h3>
+    <div class="panel">${xs.length ? xs.map(x => `<div class="xfer"><b>${esc(g.players[x.from])}</b><span class="arrow">→</span><b>${esc(g.players[x.to])}</b><b class="num" style="color:var(--gold-hi)">${money(x.amt)}</b></div>`).join('') : '<div class="muted">大家打平，不用付錢。</div>'}</div>
+    <p class="small muted">已用最少的付款筆數排好，照著付完就結清。</p>
+    <div class="stack" style="margin-top:8px">
+      <button class="btn block" data-act="copy">複製結算文字</button>
+      <textarea id="copybox" readonly hidden style="width:100%;min-height:140px;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:#08201a;color:var(--ink)">${esc(settleText(g))}</textarea>
+      ${g.endedAt ? `<button class="btn block" data-act="reopen">重新開啟這場</button><button class="btn red block" data-act="delete">刪除這場紀錄</button>`
+        : `<button class="btn gold block" data-act="end">結束牌局並封存</button>`}
+    </div>`;
+}
+function settleText(g){
+  const b = balances(g);
+  return [`麻將結算 ${dstr(g.createdAt)}`, `底 ${g.rules.base} / 台 ${g.rules.per}，共 ${g.hands.length} 局`, '',
+    ...[0,1,2,3].sort((x,y) => b[y]-b[x]).map(p => `${g.players[p]} ${fmt(b[p]) || '0'}`), '', '付款：',
+    ...transfers(b).map(x => `${g.players[x.from]} → ${g.players[x.to]} ${money(x.amt)}`)].join('\n');
+}
+
+// ---------- 底部面板 ----------
+function sheetWrap(title, body, foot){
+  return `<div class="scrim" data-act="close-scrim"><div class="sheet" role="dialog" aria-label="${esc(title)}">
+    <div class="sheet-h"><h2>${title}</h2><button class="btn ghost" data-act="close">關閉</button></div>
+    <div class="sheet-b">${body}</div>${foot ? `<div class="sheet-f">${foot}</div>` : ''}</div></div>`;
+}
+const keypad = () => `<div class="keys">${[1,2,3,4,5,6,7,8,9].map(n => `<button class="key" data-act="k" data-k="${n}">${n}</button>`).join('')}
+  <button class="key fn" data-act="k" data-k="c">清除</button><button class="key" data-act="k" data-k="0">0</button><button class="key fn" data-act="k" data-k="b" aria-label="刪除一位">⌫</button></div>`;
+
+function winSheet(){
+  const g = cur(), w = ui.win, P = g.players.map(esc), d = dealerOf(g);
+  const chip = (act, attrs, pressed, label) => `<button class="chip" data-act="${act}" ${attrs} aria-pressed="${pressed}">${label}</button>`;
+  let body = `<div class="sec"><div class="lbl">誰胡牌</div><div class="pick">${[0,1,2,3].map(p => chip('w-winner', `data-p="${p}"`, w.winner === p, P[p] + (p === d ? ' <small>莊</small>' : ''))).join('')}</div></div>`;
+  if (w.winner !== null){
+    body += `<div class="sec"><div class="lbl">怎麼胡</div><div class="pick">${chip('w-loser','data-p="-1"', w.loser === -1, '自摸')}${[0,1,2,3].filter(p => p !== w.winner).map(p => chip('w-loser', `data-p="${p}"`, w.loser === p, P[p] + ' 放槍')).join('')}</div></div>`;
+  }
+  if (w.winner !== null && w.loser !== undefined){
+    body += `<div class="sec"><div class="spread"><div class="lbl" style="font-size:12px;color:var(--gold);letter-spacing:.12em">幾台（自己算好的總台數）</div><button class="btn ghost small" data-act="w-ref">${w.showRef ? '收起台數表' : '查台數表'}</button></div>
+      <div class="screen"><b class="num ${w.tai === '' ? 'empty' : ''}">${w.tai === '' ? '0' : w.tai}</b><span>台</span></div>
+      ${w.showRef ? `<div class="panel">${refTable(g)}</div>` : ''}${keypad()}</div>`;
+    const tip = winTip(g, w);
+    if (tip) body += `<div class="note">${tip}</div>`;
+  }
+  let foot = '';
+  if (w.winner !== null && w.loser !== undefined){
+    const r = calcWin(g, w.winner, w.loser, +w.tai || 0);
+    foot = `<div class="total"><span>${P[w.winner]} 贏</span><b class="num pos">+${money(r.deltas[w.winner])}</b></div>
+      <div class="pay">${r.lines.map(l => `${P[l.p]} 付 ${money(l.amt)}${l.extra ? `（含莊家台 ${l.extra}）` : ''}`).join('　')}</div>
+      <button class="btn gold block" data-act="w-ok" style="min-height:54px;font-size:18px;font-family:var(--f-display)">記下這局</button>`;
+  }
+  return sheetWrap('胡牌', body, foot);
+}
+// 提醒莊家台要不要自己算進去
+function winTip(g, w){
+  const d = dealerOf(g), P = g.players.map(esc), dt = `<b>${dealerTai(g)} 台</b>（莊家${g.streak ? ' ' + streakName(g.streak) : ''}）`;
+  const zimo = w.loser === -1;
+  if (w.winner === d) return `莊家胡牌，記得把莊家台 ${dt} 算進台數。`;
+  if (w.loser === d) return `${P[d]} 是莊家放槍，記得把莊家台 ${dt} 算進台數。`;
+  if (zimo && g.rules.dealerPaysOnTsumo) return `閒家自摸：已開啟小規則，${P[d]} 會自動多付莊家台 ${dt}，這裡不用算。`;
+  return '';
+}
+
+function refTable(g){
+  const T = AUTO.map(([id,name]) => `<div class="ref"><span>${name}</span><b class="num">${g.rules.tai[id]} 台</b></div>`).join('');
+  return `<div class="refg"><div class="eyebrow" style="color:var(--gold)">莊家</div>${T}<div class="ref"><span><small>例：連一拉一 = 1 + 2 = 3 台，連二拉二 = 5 台</small></span></div></div>` + GROUPS.map(gr => `<div class="refg"><div class="eyebrow" style="color:var(--gold)">${gr.name}</div>${gr.items.map(([id,name,,note]) =>
+    `<div class="ref"><span>${name}${note ? `<small>${note}</small>` : ''}</span><b class="num">${taiOf(g,id)} 台</b></div>`).join('')}</div>`).join('');
+}
+function tableSheet(){
+  return sheetWrap('牌型台數表', `<p class="small muted" style="margin:0">數字可以在「底、台與規則」裡改成你們的算法。</p><div class="panel">${refTable(cur())}</div>`);
+}
+
+function moreSheet(){
+  return sheetWrap('更多', `<div class="stack">
+    <button class="btn block" data-act="sheet" data-s="table">牌型台數表</button>
+    <button class="btn block" data-act="sheet" data-s="false">詐胡（一家賠三家）</button>
+    <button class="btn block" data-act="sheet" data-s="adjust">調整莊家 / 連莊</button>
+    <button class="btn block" data-act="sheet" data-s="rules">修改底、台與規則</button>
+    <button class="btn block" data-act="settle">查看結算</button>
+    <button class="btn block" data-act="home">回首頁（牌局會保留）</button></div>`);
+}
+
+function rulesSheet(){
+  const g = cur();
+  return sheetWrap('底、台與規則', `<p class="small muted" style="margin:0">修改後只影響之後的局，已記下的局維持原本金額。</p>${rulesForm(g.rules)}<p class="small neg" id="err" role="alert"></p>`,
+    `<button class="btn gold block" data-act="rules-ok">儲存</button>`);
+}
+
+function adjustSheet(){
+  const g = cur(), a = ui.adj, P = g.players.map(esc);
+  return sheetWrap('調整莊家 / 連莊', `<p class="small muted" style="margin:0">按錯或中途加入記帳時用。圈風不會改變。</p>
+    <div class="sec"><div class="lbl">莊家</div><div class="pick">${[0,1,2,3].map(p => `<button class="chip" data-act="a-dealer" data-p="${p}" aria-pressed="${a.dealer === p}">${P[p]}</button>`).join('')}</div></div>
+    <div class="sec"><div class="lbl">連莊次數</div><div class="row"><span class="counter">${a.streak ? streakName(a.streak) : '沒有連莊'}
+      <button data-act="a-streak" data-d="-1" ${a.streak ? '' : 'disabled'} aria-label="減少">−</button><b class="num">${a.streak}</b>
+      <button data-act="a-streak" data-d="1" aria-label="增加">＋</button></span></div></div>`,
+    `<button class="btn gold block" data-act="a-ok">套用</button>`);
+}
+
+function falseSheet(){
+  const g = cur(), f = ui.fz, P = g.players.map(esc), amt = g.rules.base + (+f.tai || 0) * g.rules.per;
+  return sheetWrap('詐胡', `<div class="sec"><div class="lbl">誰詐胡</div><div class="pick">${[0,1,2,3].map(p => `<button class="chip" data-act="f-who" data-p="${p}" aria-pressed="${f.who === p}">${P[p]}</button>`).join('')}</div></div>
+    <div class="sec"><div class="lbl">賠幾台（底另計）</div>
+      <div class="screen"><b class="num ${f.tai === '' ? 'empty' : ''}">${f.tai === '' ? '0' : f.tai}</b><span>台</span></div>${keypad()}</div>
+    <div class="note">詐胡的人賠其他三家，每家 <b>${money(amt)}</b>。莊家不變。</div>`,
+    `<button class="btn gold block" data-act="f-ok" ${f.who === null ? 'disabled' : ''}>記下詐胡</button>`);
+}
+
+function renderSheet(){
+  const el = document.getElementById('sheet');
+  const prev = el.querySelector('.sheet-b'), top = prev ? prev.scrollTop : 0, same = el.dataset.s === ui.sheet;
+  const map = {confirm:confirmSheet, win:winSheet, more:moreSheet, table:tableSheet, rules:rulesSheet, adjust:adjustSheet, false:falseSheet};
+  el.innerHTML = ui.sheet && cur() ? map[ui.sheet]() : '';
+  el.dataset.s = ui.sheet || '';
+  const nb = el.querySelector('.sheet-b'); if (nb && same) nb.scrollTop = top;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  const v = ui.view;
+  app.innerHTML = v === 'backup' ? backupView() : v === 'setup' ? setupView() : v === 'game' ? gameView() : v === 'settle' ? settleView() : homeView();
+  renderSheet();
+  if (v === 'game') keepAwake();
+}
+
+// ---------- 提示 ----------
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2200);
+}
+// 確認步驟用和其他面板一樣的底部面板，手機上才不會被蓋住
+function askConfirm(msg, yesLabel, fn){
+  ui.sheet = 'confirm';
+  ui.confirm = {msg, yesLabel, fn};
+  renderSheet();
+}
+function confirmSheet(){
+  const c = ui.confirm;
+  return sheetWrap('確認', `<div style="font-size:16px">${c.msg}</div>`,
+    `<div class="grid2"><button class="btn" data-act="c-no">取消</button><button class="btn gold" data-act="c-yes">${c.yesLabel}</button></div>`);
+}
+
+let wakeLock = null;
+async function keepAwake(){
+  try { if (!wakeLock && navigator.wakeLock && document.visibilityState === 'visible'){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); } } catch(e){}
+}
+document.addEventListener('visibilitychange', () => { if (ui.view === 'game') keepAwake(); });
+
+// ---------- 範例 ----------
+function makeSample(){
+  const g = {id:newId(), createdAt:Date.now(), endedAt:null, sample:true, players:SAMPLE_NAMES.slice(), rules:defaultRules(), startDealer:0, rotations:0, streak:0, hands:[]};
+  applyWin(g, 0, -1, 5);    // 莊家門清自摸＋正花＋莊家
+  applyWin(g, 0, 2, 4);     // 莊家連一拉一，阿珍放槍
+  applyWin(g, 1, 0, 10);    // 小華胡莊家（含莊家連二拉二 5 台）
+  applyDraw(g);
+  applyWin(g, 3, -1, 6);    // 志偉自摸
+  return g;
+}
+
+// ---------- 事件 ----------
+function openWin(winner){
+  ui.sheet = 'win';
+  ui.win = {winner, loser:undefined, tai:'', showRef:false};
+  renderSheet();
+}
+function typeKey(val, k){
+  if (k === 'c') return '';
+  if (k === 'b') return val.slice(0, -1);
+  if (val.length >= 3) return val;
+  return (val === '0' ? '' : val) + k;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const act = t.dataset.act, g = cur();
+  if (act === 'close-scrim' && e.target !== t) return;
+  switch (act){
+    case 'home': ui = {view:'home', sheet:null}; render(); window.scrollTo(0,0); break;
+    case 'new': ui = {view:'setup', sheet:null}; render(); window.scrollTo(0,0); break;
+    case 'sample': { const s = makeSample(); store.games[s.id] = s; store.currentId = s.id; save(s); ui = {view:'game', sheet:null}; render(); break; }
+    case 'open': store.currentId = t.dataset.id; save(); ui = {view: cur().endedAt ? 'settle' : 'game', sheet:null}; render(); window.scrollTo(0,0); break;
+    case 'back': ui.view = 'game'; render(); break;
+    case 'settle': ui = {view:'settle', sheet:null}; render(); window.scrollTo(0,0); break;
+    case 'close': case 'close-scrim': ui.sheet = null; renderSheet(); break;
+    case 'seat': openWin(+t.dataset.p); break;
+    case 'toggle-log': ui.showAll = !ui.showAll; render(); break;
+    case 'backup': ui = {view:'backup', sheet:null}; render(); window.scrollTo(0,0); break;
+    case 'bk-copy': {
+      const code = backupCode(), box = document.getElementById('bkout');
+      const done = msg => { store.lastBackup = Date.now(); save(); toast(msg); };
+      const fallback = () => { box.value = code; box.hidden = false; box.focus(); box.select(); done('請長按框框，全選後複製'); };
+      try { navigator.clipboard.writeText(code).then(() => done('已複製備份碼，記得貼到別的地方保存'), fallback); } catch(err){ fallback(); }
+      break;
+    }
+    case 'bk-restore': {
+      const r = mergeBackup(document.getElementById('bkin').value), msg = document.getElementById('bkmsg');
+      if (r.error){ msg.className = 'small neg'; msg.textContent = r.error; break; }
+      save();
+      msg.className = 'small pos';
+      msg.textContent = `還原完成：新增 ${r.added} 場、更新 ${r.updated} 場${r.same ? `，${r.same} 場原本就有` : ''}。`;
+      document.getElementById('bkin').value = '';
+      break;
+    }
+    case 'sheet':
+      if (t.dataset.s === 'win'){ openWin(null); break; }
+      ui.sheet = t.dataset.s;
+      if (ui.sheet === 'adjust') ui.adj = {dealer:dealerOf(g), streak:g.streak};
+      if (ui.sheet === 'false') ui.fz = {who:null, tai:''};
+      renderSheet(); break;
+    case 'w-winner': { const p = +t.dataset.p; if (ui.win.winner !== p){ ui.win.winner = p; if (ui.win.loser === p) ui.win.loser = undefined; } renderSheet(); break; }
+    case 'w-loser': ui.win.loser = +t.dataset.p; renderSheet(); break;
+    case 'w-ref': ui.win.showRef = !ui.win.showRef; renderSheet(); break;
+    case 'k':
+      if (ui.sheet === 'win') ui.win.tai = typeKey(ui.win.tai, t.dataset.k);
+      else if (ui.sheet === 'false') ui.fz.tai = typeKey(ui.fz.tai, t.dataset.k);
+      renderSheet(); break;
+    case 'w-ok': {
+      const w = ui.win, before = dealerOf(g);
+      applyWin(g, w.winner, w.loser, +w.tai || 0); save(g);
+      ui.sheet = null; render();
+      toast(w.winner === before ? `莊家連莊：${streakName(g.streak)}` : `換 ${g.players[dealerOf(g)]} 坐莊`);
+      break;
+    }
+    case 'draw': applyDraw(g); save(g); render(); toast(g.rules.drawKeepsDealer ? `流局，莊家${streakName(g.streak)}` : `流局，換 ${g.players[dealerOf(g)]} 坐莊`); break;
+    case 'undo': {
+      const h = g.hands[g.hands.length - 1];
+      askConfirm(`要刪掉第 ${g.hands.length} 局（${h.round}）的紀錄嗎？莊家和連莊會一起還原。`, '刪掉這局', () => { undo(g); save(g); render(); toast('已復原上一局'); });
+      break;
+    }
+    case 'rules-ok': {
+      const r = readRules(g.rules);
+      if (typeof r === 'string'){ document.getElementById('err').textContent = r; break; }
+      g.rules = r; save(g); ui.sheet = null; render(); toast('規則已更新'); break;
+    }
+    case 'a-dealer': ui.adj.dealer = +t.dataset.p; renderSheet(); break;
+    case 'a-streak': ui.adj.streak = Math.max(0, ui.adj.streak + +t.dataset.d); renderSheet(); break;
+    case 'a-ok': {
+      const wind = Math.floor(g.rotations/4);
+      g.rotations = wind*4 + ((ui.adj.dealer - g.startDealer + 4) % 4); g.streak = ui.adj.streak;
+      save(g); ui.sheet = null; render(); toast('莊家已調整'); break;
+    }
+    case 'f-who': ui.fz.who = +t.dataset.p; renderSheet(); break;
+    case 'f-ok': applyFalse(g, ui.fz.who, +ui.fz.tai || 0); save(g); ui.sheet = null; render(); toast('已記下詐胡'); break;
+    case 'end': g.endedAt = Date.now(); save(g); ui = {view:'settle', sheet:null}; render(); window.scrollTo(0,0); toast('已封存，想繼續打可以重新開啟'); break;
+    case 'reopen': g.endedAt = null; save(g); ui.view = 'game'; render(); break;
+    case 'delete': askConfirm('刪除後無法復原，確定刪除這場紀錄？', '刪除', () => { delete store.games[g.id]; dirty.add('g' + g.id); store.currentId = null; save(); ui = {view:'home', sheet:null}; render(); }); break;
+    case 'copy': {
+      const text = settleText(g), box = document.getElementById('copybox');
+      const fallback = () => { box.hidden = false; box.focus(); box.select(); toast('請長按選取文字後複製'); };
+      try { navigator.clipboard.writeText(text).then(() => toast('已複製，可以貼到群組'), fallback); } catch(err){ fallback(); }
+      break;
+    }
+    case 'c-no': ui.sheet = null; renderSheet(); break;
+    case 'c-yes': { const fn = ui.confirm && ui.confirm.fn; ui.sheet = null; ui.confirm = null; renderSheet(); if (fn) fn(); break; }
+  }
+});
+
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'setup') return;
+  e.preventDefault();
+  const players = [0,1,2,3].map(i => document.getElementById('p'+i).value.trim() || `${WINDS[i]}家`);
+  const r = readRules(defaultRules());
+  if (typeof r === 'string'){ document.getElementById('err').textContent = r; return; }
+  const g = {id:newId(), createdAt:Date.now(), endedAt:null, players, rules:r, startDealer:+document.getElementById('sd').value, rotations:0, streak:0, hands:[]};
+  store.games[g.id] = g; store.currentId = g.id; save(g);
+  ui = {view:'game', sheet:null}; render(); window.scrollTo(0,0);
+});
+
+render();
+connect();
+</script>
+
+</body>
+</html>
