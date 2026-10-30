@@ -217,7 +217,7 @@ function defaultRules(){
   const tai = {};
   DEFS.forEach(d => tai[d.id] = d.tai);
   AUTO.forEach(([id,,t]) => tai[id] = t);
-  return {base:100, per:20, dealerPaysOnTsumo:false, drawKeepsDealer:true, tai};
+  return {base:100, per:20, drawKeepsDealer:true, tai};
 }
 
 // ---------- 牌局計算（純函式） ----------
@@ -233,14 +233,14 @@ function balances(g){
   return b;
 }
 
-// loser = -1 代表自摸。handTai 是玩家自己算好的總台數（已含莊家台）。
-// 唯一例外是可選小規則：閒家自摸時，莊家另外多付莊家台。
+// loser = -1 代表自摸。handTai 是玩家自己算好的總台數（莊家胡或莊家放槍時已含莊家台）。
+// 閒家自摸時，莊家另外多付莊家台（莊家 1 台＋連莊台），由程式自動加。
 function calcWin(g, winner, loser, handTai){
   const R = g.rules, zimo = loser === -1, dealer = dealerOf(g), dTai = dealerTai(g);
   const payers = zimo ? [0,1,2,3].filter(p => p !== winner) : [loser];
   const deltas = [0,0,0,0], lines = [];
   payers.forEach(p => {
-    const extra = zimo && R.dealerPaysOnTsumo && winner !== dealer && p === dealer ? dTai : 0;
+    const extra = zimo && winner !== dealer && p === dealer ? dTai : 0;
     const tai = handTai + extra, amt = R.base + tai * R.per;
     deltas[p] -= amt; deltas[winner] += amt;
     lines.push({p, tai, amt, extra});
@@ -450,7 +450,6 @@ function rulesForm(r){
       <label class="field" for="r_per">每台金額<input ${numAttrs} id="r_per" value="${r.per}"></label>
     </div>
     <label class="check" for="r_dkd"><input type="checkbox" id="r_dkd" ${r.drawKeepsDealer ? 'checked' : ''}><span>流局時莊家連莊<br><span class="small muted">一般打法是流局也算連莊</span></span></label>
-    <label class="check" for="r_dpt"><input type="checkbox" id="r_dpt" ${r.dealerPaysOnTsumo ? 'checked' : ''}><span>小規則：閒家自摸時，莊家要多付莊家台<br><span class="small muted">預設關閉：閒家自摸，三家付一樣</span></span></label>
     <details class="table"><summary>台數表（參考用，可改成你們的算法）</summary>
       <div class="taiedit">
         <div class="g">莊家</div>${AUTO.map(([id,name]) => n('r_t_'+id, name, r.tai[id])).join('')}
@@ -464,7 +463,6 @@ function readRules(base){
   r.base = num('r_base'); r.per = num('r_per');
   if (r.base === null || r.per === null) return '請輸入底和每台金額（0 以上的整數）';
   r.drawKeepsDealer = document.getElementById('r_dkd').checked;
-  r.dealerPaysOnTsumo = document.getElementById('r_dpt').checked;
   for (const id of [...AUTO.map(a => a[0]), ...DEFS.map(d => d.id)]){ const v = num('r_t_' + id); if (v !== null) r.tai[id] = v; }
   return r;
 }
@@ -609,7 +607,7 @@ function winTip(g, w){
   const zimo = w.loser === -1;
   if (w.winner === d) return `莊家胡牌，記得把莊家台 ${dt} 算進台數。`;
   if (w.loser === d) return `${P[d]} 是莊家放槍，記得把莊家台 ${dt} 算進台數。`;
-  if (zimo && g.rules.dealerPaysOnTsumo) return `閒家自摸：已開啟小規則，${P[d]} 會自動多付莊家台 ${dt}，這裡不用算。`;
+  if (zimo) return `閒家自摸：輸入自摸的台數就好，莊家 ${P[d]} 會自動多付莊家台 ${dt}。`;
   return '';
 }
 
